@@ -555,6 +555,10 @@ video {
   display: flex;
 }
 
+.hidden {
+  display: none;
+}
+
 .w-full {
   width: 100%;
 }
@@ -614,6 +618,11 @@ video {
 .text-9xl {
   font-size: 8rem;
   line-height: 1;
+}
+
+.text-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
 }
 
 .text-orange-500 {
