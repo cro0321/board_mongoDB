@@ -66,7 +66,8 @@
     // await(또는 then):잠시 멈춰주는기능 완료가 되면 코드 실행 const result 지금은 데이터가 별로 없어서 바로 뜨지만..  밑에 코드가 오억개라 생각해보셈... 접속했는데 뒤에 코드는 아직 덜 가져왔는데 이미 접속했고 ㄷㄷㄷ 호달달... 그래서 뒤에코드를 바로 가져오지 말고 위에 접속이 끝날때까지 기다려 주다가 뒤에 문서를 가져와주셈...  
     app.get('/list', async (req, res) => {
         // find() 전체 문서를 배열로 가져오기 /  findOne() 하나만 가져오기 너 완전 백엔드
-        const result = await db.collection("notice").find().toArray()
+        // 페이지네이션
+        const result = await db.collection("notice").find().limit(5).toArray()
         console.log(result[0])
         // ejs파일을 랜더링 하겠다 라는 뜻 너 완전 프론트엔드
         res.render('list.ejs', {
@@ -76,8 +77,21 @@
             // props데이터를 받는 방법 list.ejs
 
         })
+    })
+    // :id는 작명 가능하고 :쓰면 
+    app.get('/list/:id', async (req, res) => {
+    
+        // 페이지네이션 limit(5) skip(6) 첫 게시글 12345의 게시글 skip(0) id가 2이면 
+        const result = await db.collection("notice").find().skip((req.params.id-1)*5).limit(5).toArray()
+        console.log(result[0])
+        // ejs파일을 랜더링 하겠다 라는 뜻 너 완전 프론트엔드
+        res.render('list.ejs', {
+            // title : "abcd",
+            // name : "pes"
+            data: result
+            // props데이터를 받는 방법 list.ejs
 
-
+        })
     })
     // :id 부분 작명 RESTful 직.관.적으로 쓸것
     app.get('/view/:id', async (req, res) => {
@@ -153,14 +167,27 @@
     //     res.redirect('/list');
     // });
 
+    
+    app.get('/delete/:id', async (req, res) => {
+        await db.collection("notice").deleteOne({
+           _id: new ObjectId(req.params.id)
+       })
+       res.redirect('/list');
+       })
+   
 
+       
+    
+   
 
-    app.delete('/delete', async (req, res) => {
-         await db.collection("notice").deleteOne({
-            _id: new ObjectId(req.body._id)
-        })
-        res.redirect('/list');
-        })
+    
+
+    // app.delete('/delete', async (req, res) => {
+    //      await db.collection("notice").deleteOne({
+    //         _id: new ObjectId(req.body._id)
+    //     })
+    //     res.redirect('/list');
+    //     })
     
 
 

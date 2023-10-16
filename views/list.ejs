@@ -17,19 +17,31 @@
                 <a href="/view/<%= data[i]._id %>"><%= data[i].title %></a>
             </li>
             <li class="basis-2/4">
-
                 <%= data[i].content %> <a href="/edit/<%= data[i]._id %>">✏</a>  
-                <form action="/delete?_method=delete" method="post">
+                <!-- <form action="/delete?_method=delete" method="post">
                     <input type="hidden" name="_id" value="<%= data[i]._id %>">
                     <button>🗑</button>  
-                </form>
+                </form> -->
+                <a href="javascript:deletefun('<%= data[i]._id %>')">삭제</a>
+        
+              
             </li>
                  
         </ul>
         <% } %>
         <a href="/write">글쓰기</a>
 
-     
+        <script>
+            function deletefun(data){
+                let confirmChk = confirm("정말 삭제 하시겠습니까?");
+                console.log(data)
+                console.log(confirmChk)
+                if(confirmChk){
+                window.location.href = '/delete/'+data
+            }
+            }
+        
+        </script>
 </body>
 
 </html>
