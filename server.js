@@ -2,7 +2,34 @@
     const app = express()
     // const port = 5000
     const dotenv = require('dotenv');
+    const bcrypt = require('bcrypt')
+
+//순서 중요!
+    const session = require('express-session');
+    const passport = require('passport');
+    const LocalStrategy = require('passport-local');
+    const MongoStore = require('connect-mongo')
     dotenv.config()
+
+    app.use(passport.initialize());
+    app.use(session({
+        secret : '암호화에쓸비번', //세션 문서의 암호화
+        resave: false, //유저가 서버로 요청할 떄마다 갱싱한걸지
+        saveUninitialized: false, //로그인 안해도 세션 만들건지
+        // 일정 시간이 지났을때 자동로그인 되게 할 수 있음 60* 60 * 1000 = 1시간
+        cookie: {maxAge: 60* 60 * 1000},
+        store : MongoStore.create({
+            mongoUrl : `mongodb+srv://${process.env.MONGODB_ID}:${process.env.MONGODB_PW}@cluster0.dcnxjtw.mongodb.net/`,
+            dbName: "board"
+        })
+    }))
+
+    
+    app.use(passport.session());
+
+
+
+ 
     app.use(express.json())
     app.use(express.urlencoded({ extended: true }))
     // 기본폴더 public으로 설정
@@ -68,7 +95,7 @@
         // find() 전체 문서를 배열로 가져오기 /  findOne() 하나만 가져오기 너 완전 백엔드
         // 페이지네이션
         const result = await db.collection("notice").find().limit(5).toArray()
-        console.log(result[0])
+        // console.log(result[0])
         // ejs파일을 랜더링 하겠다 라는 뜻 너 완전 프론트엔드
         res.render('list.ejs', {
             // title : "abcd",
@@ -83,7 +110,7 @@
     
         // 페이지네이션 limit(5) skip(6) 첫 게시글 12345의 게시글 skip(0) id가 2이면 
         const result = await db.collection("notice").find().skip((req.params.id-1)*5).limit(5).toArray()
-        console.log(result[0])
+        // console.log(result[0])
         // ejs파일을 랜더링 하겠다 라는 뜻 너 완전 프론트엔드
         res.render('list.ejs', {
             // title : "abcd",
@@ -111,9 +138,10 @@
     })
     // 라우터 설정 해준것 add
     app.post('/add', async (req, res) => {
-        console.log(req.body)
+        // console.log(req.body)
         // res.render('add.ejs')
         try {
+            // 데이터 넣는 코드
             await db.collection("notice").insertOne({
                 title: req.body.title,
                 content: req.body.content
@@ -134,7 +162,7 @@
         //        $set : {원하는 키 : 변경값}
         //    })
         //    업데이트를 1개만 하겠다
-        console.log(req.body)
+        // console.log(req.body)
         await db.collection("notice").updateOne({
             _id: new ObjectId(req.body._id)
         }, {
@@ -175,11 +203,101 @@
        res.redirect('/list');
        })
    
+    //내가쓴 아이디,비번 도중에 무언가 실행하는 코드
+    passport.use(new LocalStrategy({
+        usernameField : 'userid',
+        passwordField : 'password'
+    },async (userid , password, cb)=>{
+        let result = await db.collection("users").findOne({
+            userid : userid
+        })
+        // 정보가 일치하지 않거나 없다면
+        if(!result){
+            // null은 기본값 false는 인증하지 않겠다. cb 미들웨어 도중에 실행하는것 req res의 권한을 가지는 함수 
+            return cb(null, false, {message: '아이디나 비밀번호가 일치 하지 않음'})
+        }
+        const passChk = await bcrypt.compare(password, result.password);
+        console.log(passChk)
+        if(passChk){
+            return cb(null, result);
 
-       
-    
-   
+        }else{
+            return cb(null, false, {message: "아이디나 비밀번호가 일치하지 않음"})
+        }
 
+        // if(result.password === password){
+        //     return cb(null, result);
+        // }else{
+        //     return cb(null, false, {message: '아이디나 비밀번호가 일치 하지 않음'})
+        // }
+    }))
+    // serializeUser 이 코드의 하단에서만 동작하기 때문에 상단에 코드를 해주는게 좋음 인코딩
+    passport.serializeUser((user,done)=>{
+        //비동기처리 nextTick
+        process.nextTick(()=>{
+            //done(null, 세션에 기록할 내용)
+            done(null,{id: user._id , userid: user.userid})
+        })
+    })
+
+
+    // 
+    passport.deserializeUser(async (user,done)=>{
+        let result = await db.collection("users").findOne({
+            // collection에 있는 id값을 다시 저장한다(?)
+            _id: new ObjectId(user.id)
+        })
+        delete result.password
+        // console.log(result)
+        process.nextTick(()=>{
+            done(null,result)
+        })
+    })
+
+    //아이디 비번치고 눌렀을때
+    app.get('/login', (req,res)=>{
+        res.render("login.ejs")
+    })
+    //->아이디 비번을 받을곳이 필요쓰 
+    app.post('/login', async(req,res, next)=>{
+        // console.log(req.body)
+        //  아이디 비번 받을때사용 error,user,info 국룰로 받는ㅇㅇ 
+        passport.authenticate('local' , (error,user, info)=>{
+            console.log(error,user, info);
+            // error일때 500에러(서버에러)를 받고 json형태로 나타낸다
+            if(error) return res.status(500).json(error)
+            // 유저정보가 없을때 info는 실패했을때 user가 성공했을 때 데이터
+            if(!user)  return res.status(401).json(info.message)
+            req.logIn(user, (error)=>{
+               if(error) return next(error);
+               res.redirect('/')
+
+            })
+        })(req,res,next)
+    })
+
+
+    app.get('/register', (req,res)=>{
+        res.render("register.ejs")
+    })
+
+    app.post('/register', async (req,res)=>{
+        // 뒤에 숫자를 설정하면 이걸 몇번 꼬아낼거냐~ 근데 숫자가 너무 길면은 ㄴㄴ 국룰로 10
+        let hashPass = await bcrypt.hash(req.body.password, 10);
+        // console.log(hashPass)
+        try {
+            // 데이터 넣는 코드 insertOne~~ 
+            await db.collection("users").insertOne({
+                userid: req.body.userid,
+                password: hashPass
+
+            })
+            //  await db.collection("users").insertOne(req.body) <-데이터를 정확하게 넣어주기 위해서 따로 따로 넣어주는것
+        } catch (error) {
+            console.log(error)
+        }
+        res.redirect('/list');
+    })
     
 
     // app.delete('/delete', async (req, res) => {
